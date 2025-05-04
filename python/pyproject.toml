@@ -1,0 +1,14 @@
+[project]
+name = "speakmybook"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11.9"
+dependencies = [
+    "beautifulsoup4>=4.13.4",
+    "ebooklib>=0.19",
+    "edge-tts>=7.0.2",
+    "mutagen>=1.47.0",
+    "pillow>=11.2.1",
+    "pygame>=2.6.1",
+]
