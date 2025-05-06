@@ -142,6 +142,22 @@ class EpubReader:
             print(f"获取出版社时出错: {e}")
             return "未知出版社"
   
+    def get_publish_date(self):
+        """获取出版时间，只保留年月日"""
+        try:
+            metadata = self.book.get_metadata('DC', 'date')
+            if metadata:
+                raw_date = metadata[0][0] or "未知时间"
+                # 用正则提取YYYY-MM-DD
+                match = re.match(r"(\d{4}-\d{2}-\d{2})", raw_date)
+                if match:
+                    return match.group(1)
+                return raw_date
+            return "未知时间"
+        except Exception as e:
+            print(f"获取出版时间时出错: {e}")
+            return "未知时间"
+
     def get_cover_data(self):
         """获取封面图片数据 - 优先使用 ebooklib"""
         try:
@@ -340,15 +356,22 @@ def parse_epub_data(epub_filepath):
             title = reader.get_title()
             author = reader.get_author()
             publisher = reader.get_publisher()
+            publish_date = reader.get_publish_date()
             cover_data = reader.get_cover_data()
             chapters = reader.get_chapters()
-          
+            total_words = 0
+            if chapters:
+                for chapter in chapters:
+                    total_words += len(chapter.get('content', '').replace('\n', '').replace('\r', '').replace(' ', ''))
+
             return {
                 'title': title,
                 'author': author,
                 'publisher': publisher,
+                'publish_date': publish_date,
                 'cover_data': cover_data,
-                'chapters': chapters  # chapters 是一个列表，每个元素是 {'title': '...', 'content': '...'}
+                'chapters': chapters,  # chapters 是一个列表，每个元素是 {'title': '...', 'content': '...'}
+                'total_words': total_words
             }
     except Exception as e:
         print(f"解析EPUB数据时出错: {e}")
@@ -483,13 +506,15 @@ def update_mp3_tag(mp3_path, lrc_path, cover_data, title, artist, album, lyric_l
 class EpubToMp3App:
     def __init__(self, root):
         self.root = root
-        self.root.title("SpeakMyBook")
+        self.root.title("SpeakMyBook V1.5")
         self.root.geometry("1024x700")
       
         # 存储解析后的数据
         self.epub_data = None
         self.current_chapter_index = -1  # -1 表示没有章节被选中
         self.processing = False  # 标记是否有转换任务正在进行
+        self.estimated_time_var = None  # 将在create_widgets中初始化
+        self.estimated_time_var_epub_tab = None  # 将在create_widgets中初始化
       
         # 创建临时目录
         os.makedirs(TEMP_DIR, exist_ok=True)
@@ -611,7 +636,16 @@ class EpubToMp3App:
         # )
         # self.export_all_button.pack(side=tk.LEFT, padx=(0, 5))
 
-        # 新增“生成电子书”按钮
+        # 新增"显示预计耗时"标签
+        self.estimated_time_var_epub_tab = tk.StringVar(value="预计耗时：00:00:00")
+        self.estimated_time_label_epub_tab = ttk.Label(
+            top_frame,
+            textvariable=self.estimated_time_var_epub_tab,
+            font=self.small_font
+        )
+        self.estimated_time_label_epub_tab.pack(side=tk.LEFT, padx=(0, 5))
+
+        # 新增"生成电子书"按钮
         self.generate_ebook_button_epub_tab = ttk.Button(
             top_frame,
             text="生成电子书",
@@ -619,6 +653,7 @@ class EpubToMp3App:
             state="disabled"
         )
         self.generate_ebook_button_epub_tab.pack(side=tk.LEFT, padx=(0, 5))
+
       
         # 主工作区 - 使用PanedWindow
         main_pane = ttk.PanedWindow(self.epub_frame, orient=tk.HORIZONTAL)
@@ -649,6 +684,14 @@ class EpubToMp3App:
         ttk.Label(info_frame, text="出版社:").grid(row=2, column=0, sticky=tk.W, padx=5, pady=2)
         self.publisher_label = ttk.Label(info_frame, text="")
         self.publisher_label.grid(row=2, column=1, sticky=tk.W, padx=5, pady=2)
+        
+        ttk.Label(info_frame, text="出版时间:").grid(row=3, column=0, sticky=tk.W, padx=5, pady=2)
+        self.publish_date_label = ttk.Label(info_frame, text="")
+        self.publish_date_label.grid(row=3, column=1, sticky=tk.W, padx=5, pady=2)
+
+        ttk.Label(info_frame, text="全书字数:").grid(row=4, column=0, sticky=tk.W, padx=5, pady=2)
+        self.total_words_label = ttk.Label(info_frame, text="")
+        self.total_words_label.grid(row=4, column=1, sticky=tk.W, padx=5, pady=2)
       
         # 中间章节列表区域
         middle_frame = ttk.Frame(main_pane, width=300)
@@ -834,7 +877,16 @@ class EpubToMp3App:
         # 转换按钮和进度
         self.batch_button_frame = ttk.Frame(mp3_main_frame, padding=5)
         self.batch_button_frame.pack(fill=tk.X, pady=(10, 5))
-    
+
+        # 添加预计耗时标签
+        self.estimated_time_var = tk.StringVar(value="预计耗时：00:00:00")
+        self.estimated_time_label = ttk.Label(
+            self.batch_button_frame,
+            textvariable=self.estimated_time_var,
+            font=self.small_font
+        )
+        self.estimated_time_label.pack(side=tk.LEFT, padx=(0, 10))
+
         self.generate_ebook_button = ttk.Button(
             self.batch_button_frame,
             text="生成电子书",
@@ -957,6 +1009,15 @@ class EpubToMp3App:
         self.title_label.config(text="")
         self.author_label.config(text="")
         self.publisher_label.config(text="")
+        self.publish_date_label.config(text="")
+        self.total_words_label.config(text="")
+
+        # 重置预计耗时
+        if hasattr(self, 'estimated_time_var') and self.estimated_time_var:
+            self.estimated_time_var.set("预计耗时：00:00:00")
+        if hasattr(self, 'estimated_time_var_epub_tab') and self.estimated_time_var_epub_tab:
+            self.estimated_time_var_epub_tab.set("预计耗时：00:00:00")
+
       
         # 清空封面
         self.cover_label.config(image="", text="图书封面")
@@ -989,6 +1050,11 @@ class EpubToMp3App:
         self.title_label.config(text=self.epub_data['title'])
         self.author_label.config(text=self.epub_data['author'])
         self.publisher_label.config(text=self.epub_data['publisher'])
+        self.publish_date_label.config(text=self.epub_data.get('publish_date', ''))
+        if 'total_words' in self.epub_data:
+            self.total_words_label.config(text=str(self.epub_data['total_words']))
+        else:
+            self.total_words_label.config(text="")
 
         # 更新专辑和艺术家
         self.album_var.set(self.epub_data['title'])
@@ -1058,7 +1124,11 @@ class EpubToMp3App:
             except Exception as e:
                 print(f"创建有声书目录失败: {e}")
             self.output_dir_var.set(target_dir)
-        # ---- END ----
+        
+        # ---- 新增：计算并显示预计耗时 ----
+        estimated_time = self.calculate_estimated_time()
+        self.estimated_time_var.set(f"预计耗时：{estimated_time}")
+        self.estimated_time_var_epub_tab.set(f"预计耗时：{estimated_time}")
               
     def on_chapter_select(self, event):
         """处理章节列表选择事件"""
@@ -1121,23 +1191,43 @@ class EpubToMp3App:
         """删除指定的章节"""
         if not self.epub_data or 'chapters' not in self.epub_data:
             return
-          
+
         if index < 0 or index >= len(self.epub_data['chapters']):
             return
-          
+
         # 获取章节标题
         chapter_title = self.epub_data['chapters'][index]['title']
-      
+
         # 确认删除
         if not messagebox.askyesno("确认删除", f"确定要删除章节 '{chapter_title}' 吗？"):
             return
-          
+
         # 删除章节
         del self.epub_data['chapters'][index]
-      
-        # 更新界面
+
+        # --- 新增代码开始 ---
+        # 重新计算总字数（如果在epub_data中存储了这个信息）
+        # 或者更准确地说，重新计算所有剩余章节的总字数
+        total_words = 0
+        if self.epub_data.get('chapters'):
+            for chapter in self.epub_data['chapters']:
+                total_words += len(chapter.get('content', '').replace('\n', '').replace('\r', '').replace(' ', ''))
+        self.epub_data['total_words'] = total_words # 更新内存中的总字数
+
+        # 更新GUI上的总字数显示
+        self.total_words_label.config(text=str(self.epub_data['total_words']))
+
+        # 更新预计耗时标签
+        estimated_time = self.calculate_estimated_time()
+        if hasattr(self, 'estimated_time_var') and self.estimated_time_var:
+            self.estimated_time_var.set(f"预计耗时：{estimated_time}")
+        if hasattr(self, 'estimated_time_var_epub_tab') and self.estimated_time_var_epub_tab:
+            self.estimated_time_var_epub_tab.set(f"预计耗时：{estimated_time}")
+        # --- 新增代码结束 ---
+
+        # 更新界面 (删除列表项、清空章节内容等)
         self.chapter_listbox.delete(index)
-      
+
         # 更新当前章节索引
         if self.current_chapter_index == index:
             self.current_chapter_index = -1
@@ -1146,8 +1236,9 @@ class EpubToMp3App:
             self.convert_chapter_button.config(state="disabled")
         elif self.current_chapter_index > index:
             self.current_chapter_index -= 1
-          
+
         self.update_status(f"已删除章节: {chapter_title}")
+
       
     # def export_all_chapters(self):
     #     """导出所有章节为TXT文件"""
@@ -1747,6 +1838,19 @@ class EpubToMp3App:
             pass
 
         self.root.destroy()
+
+    def calculate_estimated_time(self):
+        """计算预计耗时，基于字数"""
+        if not self.epub_data or 'total_words' not in self.epub_data:
+            return "00:00:00"
+
+        total_words = self.epub_data['total_words']
+        total_seconds = int(total_words / 80 + 0.5)  # 四舍五入
+
+        hours, remainder = divmod(total_seconds, 3600)
+        minutes, seconds = divmod(remainder, 60)
+
+        return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
 
 def main():
     """主函数"""

@@ -27,9 +27,9 @@ func main() {
 		}
 	}
 
-	// 检查 uv.exe 是否存在
-	uvPath := filepath.Join("C:", "Users", username, ".local", "bin", "uv.exe")
-	_, err := os.Stat(uvPath)
+	// 检查 uv 是否存在并可用
+	cmd = exec.Command("uv", "-V")
+	err := cmd.Run()
 
 	if err == nil {
 		fmt.Println("uv 已安装，直接运行程序...")
