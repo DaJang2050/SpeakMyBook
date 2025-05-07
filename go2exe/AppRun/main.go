@@ -154,6 +154,26 @@ func runPythonApp() error {
 
 	log.Printf("正在启动 Python 应用")
 
+	// 执行 uv sync 命令，配置清华源
+	log.Printf("正在执行 uv sync 配置清华源...")
+	syncCmd := exec.Command("cmd", "/c", "uv", "sync", "--default-index", "https://pypi.tuna.tsinghua.edu.cn/simple")
+	// 隐藏窗口
+	syncCmd.SysProcAttr = &syscall.SysProcAttr{
+		HideWindow: true,
+	}
+
+	var syncOutBuf bytes.Buffer
+	syncCmd.Stdout = &syncOutBuf
+	syncCmd.Stderr = &syncOutBuf
+
+	err = syncCmd.Run()
+	if err != nil {
+		log.Printf("uv sync 配置失败: %v, 输出: %s", err, syncOutBuf.String())
+		// 尽管配置失败，仍然继续尝试启动应用
+	} else {
+		log.Printf("uv sync 配置成功，输出: %s", syncOutBuf.String())
+	}
+
 	// 执行Python应用
 	cmd := exec.Command(".\\.venv\\Scripts\\pythonw.exe", "app.pyw", "--default-index", "https://pypi.tuna.tsinghua.edu.cn/simple")
 	// 这里不要隐藏窗口，因为是启动真正的应用程序
