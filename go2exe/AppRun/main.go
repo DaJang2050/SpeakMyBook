@@ -9,7 +9,29 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"unsafe"
 )
+
+// Windows API 函数声明
+var (
+	user32             = syscall.NewLazyDLL("user32.dll")
+	messageBox         = user32.NewProc("MessageBoxW")
+	MB_OK              = 0x00000000
+	MB_ICONINFORMATION = 0x00000040
+	MB_ICONEXCLAMATION = 0x00000030
+)
+
+// 显示消息框
+func showMessageBox(title, message string) {
+	titlePtr, _ := syscall.UTF16PtrFromString(title)
+	messagePtr, _ := syscall.UTF16PtrFromString(message)
+	messageBox.Call(
+		0,
+		uintptr(unsafe.Pointer(messagePtr)),
+		uintptr(unsafe.Pointer(titlePtr)),
+		uintptr(MB_OK|MB_ICONINFORMATION),
+	)
+}
 
 func init() {
 	// 创建日志文件
@@ -207,6 +229,8 @@ func main() {
 
 	// 如果未安装uv，则安装
 	if !uvInstalled {
+		// 首先弹出一个简单的消息框告知用户
+		showMessageBox("环境安装", "即将开始安装必要的环境组件，请稍候...\n\n这个过程只在首次运行时执行，可能需要几分钟。")
 		log.Printf("正在安装uv...")
 		err = installUV(exeDir)
 		if err != nil {
