@@ -506,7 +506,7 @@ def update_mp3_tag(mp3_path, lrc_path, cover_data, title, artist, album, lyric_l
 class EpubToMp3App:
     def __init__(self, root):
         self.root = root
-        self.root.title("SpeakMyBook V1.8")
+        self.root.title("SpeakMyBook V2.1.0")
         self.root.geometry("1024x700")
       
         # 存储解析后的数据
