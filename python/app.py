@@ -785,7 +785,13 @@ class EpubToMp3App:
             "zh-CN-YunxiNeural",     # 男童声
             "zh-CN-XiaoyiNeural",    # 女声
             "zh-CN-YunyangNeural",   # 男声
-            "zh-CN-liaoning-XiaobeiNeural"  # 女声，辽宁口音
+            "zh-CN-liaoning-XiaobeiNeural",  # 女声，辽宁口音
+            "en-US-BrianMultilingualNeural", # 英文
+            "en-US-BrianNeural",
+            "en-US-AndrewMultilingualNeural",
+            "en-US-AndrewNeural",
+            "en-US-EmmaMultilingualNeural",
+            "en-US-EmmaNeural",
         ]
         voice_combo.grid(row=0, column=1, sticky=tk.W, padx=5, pady=5)
 
