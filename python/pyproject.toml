@@ -9,6 +9,7 @@ dependencies = [
     "ebooklib>=0.19",
     "edge-tts>=7.0.2",
     "mutagen>=1.47.0",
+    "nuitka>=2.7.12",
     "pillow>=11.2.1",
     "pygame>=2.6.1",
 ]
